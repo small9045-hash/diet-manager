@@ -2,6 +2,7 @@ import streamlit as st
 import random
 import pandas as pd
 import plotly.graph_objects as go
+import requests
 
 # ══════════════════════════════════════════════════════
 # 데이터
@@ -194,6 +195,25 @@ def status_color(ratio):
     elif ratio <= 150: return "#f59e0b"
     else:              return "#ef4444"
 
+def search_food(query):
+    """식품의약품안전처 식품영양성분 API 검색"""
+    try:
+        api_key = st.secrets["API_KEY"]
+        url = "https://apis.data.go.kr/1471000/FoodNtrCpntDbInfo02/getFoodNtrCpntDbInq02"
+        params = {
+            "serviceKey": api_key,
+            "pageNo": 1,
+            "numOfRows": 10,
+            "type": "json",
+            "FOOD_NM_KR": query,
+        }
+        res = requests.get(url, params=params, timeout=5)
+        data = res.json()
+        items = data.get("body", {}).get("items", [])
+        return items if items else []
+    except Exception as e:
+        return []
+
 
 # ══════════════════════════════════════════════════════
 # 페이지 설정
@@ -212,19 +232,22 @@ st.markdown("""
     .option-card {
         background: #f0fdf4; border-radius: 16px;
         padding: 2.5rem; text-align: center;
-        border: 2px solid #bbf7d0;
-        margin-bottom: 1rem;
+        border: 2px solid #bbf7d0; margin-bottom: 1rem;
     }
     .option-icon { font-size: 3.5rem; }
     .option-title { font-size: 1.4rem; font-weight: 700; margin: 0.6rem 0 0.3rem; }
     .option-desc { color: #6b7280; font-size: 0.9rem; line-height: 1.5; }
     .metric-box {
         background: #f0fdf4; border-radius: 12px;
-        padding: 1rem; text-align: center;
-        border: 1px solid #bbf7d0;
+        padding: 1rem; text-align: center; border: 1px solid #bbf7d0;
     }
     .metric-val { font-size: 1.6rem; font-weight: 700; color: #15803d; }
     .metric-label { font-size: 0.8rem; color: #6b7280; margin-top: 0.2rem; }
+    .food-result {
+        background: #f8fafc; border-radius: 10px;
+        padding: 0.7rem 1rem; margin-bottom: 0.4rem;
+        border-left: 4px solid #4ade80; cursor: pointer;
+    }
     .meal-card {
         background: #f8fafc; border-radius: 10px;
         padding: 0.8rem 1rem; margin-bottom: 0.5rem;
@@ -250,6 +273,10 @@ st.divider()
 
 if "option" not in st.session_state:
     st.session_state.option = None
+if "foods" not in st.session_state:
+    st.session_state.foods = []
+if "search_results" not in st.session_state:
+    st.session_state.search_results = []
 
 if st.session_state.option is None:
     st.markdown("## 원하는 기능을 선택하세요")
@@ -259,7 +286,7 @@ if st.session_state.option is None:
         <div class="option-card">
             <div class="option-icon">📊</div>
             <div class="option-title">옵션 1. 영양소 분석</div>
-            <div class="option-desc">오늘 먹은 음식을 입력하면<br>BMR + 활동량 기반 개인 맞춤<br>권장량과 비교 분석해드려요</div>
+            <div class="option-desc">음식 이름을 검색하면<br>칼로리/영양소가 자동으로 입력되고<br>개인 맞춤 권장량과 비교 분석해드려요</div>
         </div>
         """, unsafe_allow_html=True)
         if st.button("📊 옵션 1 선택", use_container_width=True, type="primary"):
@@ -278,22 +305,21 @@ if st.session_state.option is None:
             st.rerun()
     st.stop()
 
-# 처음으로 버튼
 if st.button("← 처음으로 돌아가기"):
     st.session_state.option = None
-    if "foods" in st.session_state:
-        st.session_state.foods = []
+    st.session_state.foods = []
+    st.session_state.search_results = []
     st.rerun()
 
 st.divider()
 
 # ══════════════════════════════════════════════════════
-# 옵션 1: 영양소 분석
+# 옵션 1: 영양소 분석 (API 연동)
 # ══════════════════════════════════════════════════════
 
 if st.session_state.option == 1:
     st.subheader("📊 옵션 1 : 하루 섭취 영양소 분석")
-    st.caption("BMR + 활동량으로 개인 맞춤 권장 칼로리를 산출하고 영양소를 분석합니다.")
+    st.caption("음식 이름을 검색하면 칼로리/영양소가 자동으로 입력됩니다.")
 
     with st.expander("👤 기본 정보 입력", expanded=True):
         c1, c2, c3, c4 = st.columns(4)
@@ -322,38 +348,76 @@ if st.session_state.option == 1:
         st.markdown(f'<div class="metric-box"><div class="metric-val">{round(tdee1)}</div><div class="metric-label">오늘 권장 칼로리 (kcal)</div></div>', unsafe_allow_html=True)
 
     st.divider()
-    st.subheader("🍽️ 오늘 섭취한 음식 입력")
+    st.subheader("🍽️ 음식 검색 & 추가")
 
-    if "foods" not in st.session_state:
-        st.session_state.foods = []
+    # 음식 검색
+    sc1, sc2 = st.columns([4, 1])
+    with sc1:
+        search_query = st.text_input("음식 이름 검색", placeholder="예: 잡곡밥, 닭가슴살, 바나나")
+    with sc2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        search_btn = st.button("🔍 검색", use_container_width=True)
 
-    with st.form("food_form", clear_on_submit=True):
-        fc1, fc2, fc3, fc4 = st.columns(4)
-        with fc1:
-            f_name = st.text_input("음식 이름")
-            f_cal  = st.number_input("칼로리 (kcal)", 0.0, 5000.0, 0.0)
-        with fc2:
-            f_prot = st.number_input("단백질 (g)", 0.0, 500.0, 0.0)
-            f_fat  = st.number_input("지방 (g)", 0.0, 500.0, 0.0)
-        with fc3:
-            f_carb = st.number_input("탄수화물 (g)", 0.0, 1000.0, 0.0)
-            f_calc = st.number_input("칼슘 (mg)", 0.0, 5000.0, 0.0)
-        with fc4:
-            f_iron = st.number_input("철분 (mg)", 0.0, 100.0, 0.0)
-            f_vitc = st.number_input("비타민C (mg)", 0.0, 2000.0, 0.0)
-        add_btn = st.form_submit_button("➕ 음식 추가", use_container_width=True)
-        if add_btn and f_name.strip():
-            st.session_state.foods.append({
-                "이름": f_name.strip(),
-                "칼로리": f_cal, "단백질": f_prot, "지방": f_fat,
-                "탄수화물": f_carb, "칼슘": f_calc, "철분": f_iron, "비타민C": f_vitc,
-            })
-            st.success(f"'{f_name}' 추가됨!")
+    if search_btn and search_query:
+        with st.spinner("검색 중..."):
+            results = search_food(search_query)
+            st.session_state.search_results = results
 
+    # 검색 결과 표시
+    if st.session_state.search_results:
+        st.markdown("**검색 결과** (추가할 음식 선택)")
+        for i, item in enumerate(st.session_state.search_results):
+            name  = item.get("FOOD_NM_KR", "")
+            cal   = float(item.get("ENGY", 0) or 0)
+            prot  = float(item.get("PROT", 0) or 0)
+            fat   = float(item.get("FAT", 0) or 0)
+            carb  = float(item.get("CHOCDF", 0) or 0)
+            calc  = float(item.get("CA", 0) or 0)
+            iron  = float(item.get("FE", 0) or 0)
+            vitc  = float(item.get("VITC", 0) or 0)
+
+            col_info, col_btn = st.columns([5, 1])
+            with col_info:
+                st.markdown(f"""
+                <div class="food-result">
+                    <b>{name}</b><br>
+                    <span style="font-size:0.82rem; color:#6b7280;">
+                    칼로리 {cal:.0f}kcal | 단백질 {prot:.1f}g | 탄수화물 {carb:.1f}g | 지방 {fat:.1f}g
+                    </span>
+                </div>
+                """, unsafe_allow_html=True)
+            with col_btn:
+                if st.button("➕ 추가", key=f"add_{i}"):
+                    st.session_state.foods.append({
+                        "이름": name,
+                        "칼로리": cal, "단백질": prot, "지방": fat,
+                        "탄수화물": carb, "칼슘": calc, "철분": iron, "비타민C": vitc,
+                    })
+                    st.success(f"'{name}' 추가됨!")
+                    st.rerun()
+    elif search_btn and search_query:
+        st.warning("검색 결과가 없습니다. 다른 이름으로 검색해보세요.")
+
+    # 추가된 음식 목록
     if st.session_state.foods:
-        st.markdown("**입력된 음식 목록**")
+        st.divider()
+        st.markdown("**오늘 먹은 음식 목록**")
         df_foods = pd.DataFrame(st.session_state.foods)
         st.dataframe(df_foods, use_container_width=True, hide_index=True)
+
+        # 합계 표시
+        total = {k: sum(f[k] for f in st.session_state.foods)
+                 for k in ["칼로리", "단백질", "지방", "탄수화물", "칼슘", "철분", "비타민C"]}
+
+        t1, t2, t3, t4 = st.columns(4)
+        with t1:
+            st.markdown(f'<div class="metric-box"><div class="metric-val">{total["칼로리"]:.0f}</div><div class="metric-label">총 칼로리 (kcal)</div></div>', unsafe_allow_html=True)
+        with t2:
+            st.markdown(f'<div class="metric-box"><div class="metric-val">{total["단백질"]:.1f}</div><div class="metric-label">총 단백질 (g)</div></div>', unsafe_allow_html=True)
+        with t3:
+            st.markdown(f'<div class="metric-box"><div class="metric-val">{total["탄수화물"]:.1f}</div><div class="metric-label">총 탄수화물 (g)</div></div>', unsafe_allow_html=True)
+        with t4:
+            st.markdown(f'<div class="metric-box"><div class="metric-val">{total["지방"]:.1f}</div><div class="metric-label">총 지방 (g)</div></div>', unsafe_allow_html=True)
 
         if st.button("🗑️ 전체 초기화"):
             st.session_state.foods = []
@@ -361,9 +425,6 @@ if st.session_state.option == 1:
 
         st.divider()
         st.subheader("📋 분석 결과")
-
-        total = {k: sum(f[k] for f in st.session_state.foods)
-                 for k in ["칼로리", "단백질", "지방", "탄수화물", "칼슘", "철분", "비타민C"]}
 
         rows = []
         for nutrient, unit in UNITS.items():
@@ -409,7 +470,7 @@ if st.session_state.option == 1:
         else:
             st.success("✅ 오늘 칼로리를 딱 맞게 섭취했습니다!")
     else:
-        st.info("음식을 추가하면 분석 결과가 여기에 표시됩니다.")
+        st.info("음식을 검색해서 추가하면 분석 결과가 여기에 표시됩니다.")
 
 # ══════════════════════════════════════════════════════
 # 옵션 2: 일주일 식단 생성
