@@ -209,7 +209,10 @@ def search_food(query):
         }
         res = requests.get(url, params=params, timeout=5)
         data = res.json()
-        items = data.get("body", {}).get("items", [])
+        items = data.get("body", {}).get("items", []) or data.get("items", [])
+        # 첫번째 아이템 키 확인용
+        if items and isinstance(items, list) and len(items) > 0:
+            st.session_state["_debug_keys"] = list(items[0].keys())
         return items if items else []
     except Exception as e:
         return []
@@ -367,14 +370,14 @@ if st.session_state.option == 1:
     if st.session_state.search_results:
         st.markdown("**검색 결과** (추가할 음식 선택)")
         for i, item in enumerate(st.session_state.search_results):
-            name  = item.get("FOOD_NM_KR", "")
-            cal   = float(item.get("ENGY", 0) or 0)
-            prot  = float(item.get("PROT", 0) or 0)
-            fat   = float(item.get("FAT", 0) or 0)
-            carb  = float(item.get("CHOCDF", 0) or 0)
-            calc  = float(item.get("CA", 0) or 0)
-            iron  = float(item.get("FE", 0) or 0)
-            vitc  = float(item.get("VITC", 0) or 0)
+            name  = item.get("FOOD_NM_KR", "") or item.get("foodNmKr", "")
+            cal   = float(item.get("AMT_NUM1", 0) or item.get("ENGY", 0) or 0)
+            prot  = float(item.get("AMT_NUM3", 0) or item.get("PROT", 0) or 0)
+            fat   = float(item.get("AMT_NUM4", 0) or item.get("FAT", 0) or 0)
+            carb  = float(item.get("AMT_NUM2", 0) or item.get("CHOCDF", 0) or 0)
+            calc  = float(item.get("AMT_NUM7", 0) or item.get("CA", 0) or 0)
+            iron  = float(item.get("AMT_NUM8", 0) or item.get("FE", 0) or 0)
+            vitc  = float(item.get("AMT_NUM10", 0) or item.get("VITC", 0) or 0)
 
             col_info, col_btn = st.columns([5, 1])
             with col_info:
