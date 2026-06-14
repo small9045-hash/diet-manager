@@ -181,8 +181,8 @@ def calc_bmr(gender, weight, height, age):
         return 10 * weight + 6.25 * height - 5 * age - 161
 
 def status_label(ratio):
-    if ratio < 60:    return "🔴 매우 부족"
-    elif ratio < 80:  return "🟡 부족"
+    if ratio < 60:     return "🔴 매우 부족"
+    elif ratio < 80:   return "🟡 부족"
     elif ratio <= 120: return "🟢 적정"
     elif ratio <= 150: return "🟡 약간 과잉"
     else:              return "🔴 과잉"
@@ -209,11 +209,15 @@ st.markdown("""
         -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         margin-bottom: 0.2rem;
     }
-    .card {
-        background: white; border-radius: 16px;
-        padding: 1.5rem; box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+    .option-card {
+        background: #f0fdf4; border-radius: 16px;
+        padding: 2.5rem; text-align: center;
+        border: 2px solid #bbf7d0;
         margin-bottom: 1rem;
     }
+    .option-icon { font-size: 3.5rem; }
+    .option-title { font-size: 1.4rem; font-weight: 700; margin: 0.6rem 0 0.3rem; }
+    .option-desc { color: #6b7280; font-size: 0.9rem; line-height: 1.5; }
     .metric-box {
         background: #f0fdf4; border-radius: 12px;
         padding: 1rem; text-align: center;
@@ -231,8 +235,7 @@ st.markdown("""
     .tip-box {
         background: #fffbeb; border-radius: 10px;
         padding: 0.7rem 1rem; margin-bottom: 0.4rem;
-        border-left: 3px solid #fbbf24;
-        font-size: 0.9rem;
+        border-left: 3px solid #fbbf24; font-size: 0.9rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -241,15 +244,55 @@ st.markdown('<div class="main-title">🥗 식단 관리 프로그램</div>', uns
 st.markdown("**개인 맞춤 영양 분석 & 목표별 일주일 식단 생성**")
 st.divider()
 
-tab1, tab2 = st.tabs(["📊 영양소 분석", "🗓️ 일주일 식단 생성"])
-
-
 # ══════════════════════════════════════════════════════
-# 탭 1: 영양소 분석
+# 옵션 선택 화면
 # ══════════════════════════════════════════════════════
 
-with tab1:
-    st.subheader("📊 하루 섭취 영양소 분석")
+if "option" not in st.session_state:
+    st.session_state.option = None
+
+if st.session_state.option is None:
+    st.markdown("## 원하는 기능을 선택하세요")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("""
+        <div class="option-card">
+            <div class="option-icon">📊</div>
+            <div class="option-title">옵션 1. 영양소 분석</div>
+            <div class="option-desc">오늘 먹은 음식을 입력하면<br>BMR + 활동량 기반 개인 맞춤<br>권장량과 비교 분석해드려요</div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("📊 옵션 1 선택", use_container_width=True, type="primary"):
+            st.session_state.option = 1
+            st.rerun()
+    with col2:
+        st.markdown("""
+        <div class="option-card">
+            <div class="option-icon">🗓️</div>
+            <div class="option-title">옵션 2. 일주일 식단 생성</div>
+            <div class="option-desc">목표(벌크업/린매스업/다이어트)와<br>신체 정보를 입력하면<br>맞춤 일주일 식단을 생성해드려요</div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("🗓️ 옵션 2 선택", use_container_width=True, type="primary"):
+            st.session_state.option = 2
+            st.rerun()
+    st.stop()
+
+# 처음으로 버튼
+if st.button("← 처음으로 돌아가기"):
+    st.session_state.option = None
+    if "foods" in st.session_state:
+        st.session_state.foods = []
+    st.rerun()
+
+st.divider()
+
+# ══════════════════════════════════════════════════════
+# 옵션 1: 영양소 분석
+# ══════════════════════════════════════════════════════
+
+if st.session_state.option == 1:
+    st.subheader("📊 옵션 1 : 하루 섭취 영양소 분석")
     st.caption("BMR + 활동량으로 개인 맞춤 권장 칼로리를 산출하고 영양소를 분석합니다.")
 
     with st.expander("👤 기본 정보 입력", expanded=True):
@@ -262,10 +305,8 @@ with tab1:
             weight1 = st.number_input("체중 (kg)", 30.0, 200.0, 70.0, key="wt1")
         with c4:
             height1 = st.number_input("키 (cm)", 100.0, 220.0, 170.0, key="ht1")
-
         activity1 = st.selectbox("활동량", list(ACTIVITY_LEVELS.keys()), index=2, key="act1")
 
-    # BMR / TDEE 계산
     bmr1  = calc_bmr(gender1, weight1, height1, age1)
     tdee1 = bmr1 * ACTIVITY_LEVELS[activity1]
     age_group1 = get_age_group(age1)
@@ -300,7 +341,6 @@ with tab1:
         with fc4:
             f_iron = st.number_input("철분 (mg)", 0.0, 100.0, 0.0)
             f_vitc = st.number_input("비타민C (mg)", 0.0, 2000.0, 0.0)
-
         add_btn = st.form_submit_button("➕ 음식 추가", use_container_width=True)
         if add_btn and f_name.strip():
             st.session_state.foods.append({
@@ -315,11 +355,9 @@ with tab1:
         df_foods = pd.DataFrame(st.session_state.foods)
         st.dataframe(df_foods, use_container_width=True, hide_index=True)
 
-        col_del, col_reset = st.columns([3, 1])
-        with col_reset:
-            if st.button("🗑️ 전체 초기화", use_container_width=True):
-                st.session_state.foods = []
-                st.rerun()
+        if st.button("🗑️ 전체 초기화"):
+            st.session_state.foods = []
+            st.rerun()
 
         st.divider()
         st.subheader("📋 분석 결과")
@@ -327,7 +365,6 @@ with tab1:
         total = {k: sum(f[k] for f in st.session_state.foods)
                  for k in ["칼로리", "단백질", "지방", "탄수화물", "칼슘", "철분", "비타민C"]}
 
-        # 영양소 테이블
         rows = []
         for nutrient, unit in UNITS.items():
             intake    = total[nutrient]
@@ -342,39 +379,28 @@ with tab1:
             })
         st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
-        # 달성률 바 차트
         nutrients = list(UNITS.keys())
         ratios    = [total[n] / standard1[n] * 100 for n in nutrients]
         colors    = [status_color(r) for r in ratios]
-
         fig = go.Figure(go.Bar(
-            x=nutrients, y=ratios,
-            marker_color=colors,
-            text=[f"{r:.0f}%" for r in ratios],
-            textposition="outside",
+            x=nutrients, y=ratios, marker_color=colors,
+            text=[f"{r:.0f}%" for r in ratios], textposition="outside",
         ))
         fig.add_hline(y=100, line_dash="dash", line_color="#9ca3af", annotation_text="권장량 100%")
-        fig.update_layout(
-            title="영양소 달성률 (%)",
-            yaxis_title="%", xaxis_title="",
-            height=380, plot_bgcolor="white",
-            yaxis=dict(gridcolor="#f3f4f6"),
-        )
+        fig.update_layout(title="영양소 달성률 (%)", yaxis_title="%",
+                          height=380, plot_bgcolor="white", yaxis=dict(gridcolor="#f3f4f6"))
         st.plotly_chart(fig, use_container_width=True)
 
-        # 매크로 파이차트
         mac_cal = total["단백질"]*4 + total["지방"]*9 + total["탄수화물"]*4
         if mac_cal > 0:
             fig2 = go.Figure(go.Pie(
                 labels=["단백질", "지방", "탄수화물"],
                 values=[total["단백질"]*4, total["지방"]*9, total["탄수화물"]*4],
-                hole=0.45,
-                marker_colors=["#4ade80", "#fb923c", "#60a5fa"],
+                hole=0.45, marker_colors=["#4ade80", "#fb923c", "#60a5fa"],
             ))
             fig2.update_layout(title="칼로리 매크로 비율", height=320)
             st.plotly_chart(fig2, use_container_width=True)
 
-        # 칼로리 잔여
         cal_remain = round(tdee1) - total["칼로리"]
         if cal_remain > 0:
             st.info(f"🔋 오늘 남은 칼로리 여유: **{cal_remain:.0f} kcal**")
@@ -385,13 +411,12 @@ with tab1:
     else:
         st.info("음식을 추가하면 분석 결과가 여기에 표시됩니다.")
 
-
 # ══════════════════════════════════════════════════════
-# 탭 2: 일주일 식단 생성
+# 옵션 2: 일주일 식단 생성
 # ══════════════════════════════════════════════════════
 
-with tab2:
-    st.subheader("🗓️ 목표 맞춤 일주일 식단 생성")
+elif st.session_state.option == 2:
+    st.subheader("🗓️ 옵션 2 : 목표 맞춤 일주일 식단 생성")
 
     with st.expander("👤 기본 정보 입력", expanded=True):
         d1, d2, d3, d4 = st.columns(4)
@@ -403,13 +428,11 @@ with tab2:
             weight2 = st.number_input("체중 (kg)", 30.0, 200.0, 70.0, key="wt2")
         with d4:
             height2 = st.number_input("키 (cm)", 100.0, 220.0, 170.0, key="ht2")
-
         activity2 = st.selectbox("활동량", list(ACTIVITY_LEVELS.keys()), index=2, key="act2")
         goal_key  = st.radio("목표", list(GOAL_DB.keys()), horizontal=True)
 
     if st.button("🗓️ 일주일 식단 생성", type="primary", use_container_width=True):
         goal_name, meal_db, cal_ratio, macro_guide = GOAL_DB[goal_key]
-
         bmr2       = calc_bmr(gender2, weight2, height2, age2)
         tdee2      = bmr2 * ACTIVITY_LEVELS[activity2]
         target_cal = tdee2 * cal_ratio
@@ -456,8 +479,8 @@ with tab2:
                     """, unsafe_allow_html=True)
 
                 for k in day_total:
-                    day_total[k]  += chosen[k]
-                    weekly[k]     += chosen[k]
+                    day_total[k] += chosen[k]
+                    weekly[k]    += chosen[k]
 
             diff = day_total["칼로리"] - target_cal
             diff_str = f"+{diff:.0f}" if diff >= 0 else f"{diff:.0f}"
@@ -465,7 +488,6 @@ with tab2:
             day_cals.append(day_total["칼로리"])
             st.divider()
 
-        # 주간 요약
         st.subheader("📈 주간 요약")
         s1, s2, s3, s4 = st.columns(4)
         with s1:
@@ -477,23 +499,16 @@ with tab2:
         with s4:
             st.metric("총 지방", f"{weekly['지방']:,} g", f"일 평균 {weekly['지방']/7:.0f} g")
 
-        # 일별 칼로리 차트
         fig3 = go.Figure(go.Bar(
-            x=DAYS, y=day_cals,
-            marker_color="#4ade80",
-            text=[f"{c}kcal" for c in day_cals],
-            textposition="outside",
+            x=DAYS, y=day_cals, marker_color="#4ade80",
+            text=[f"{c}kcal" for c in day_cals], textposition="outside",
         ))
         fig3.add_hline(y=target_cal, line_dash="dash", line_color="#ef4444",
                        annotation_text=f"목표 {target_cal:.0f}kcal")
-        fig3.update_layout(
-            title="요일별 칼로리", yaxis_title="kcal",
-            height=350, plot_bgcolor="white",
-            yaxis=dict(gridcolor="#f3f4f6"),
-        )
+        fig3.update_layout(title="요일별 칼로리", yaxis_title="kcal",
+                           height=350, plot_bgcolor="white", yaxis=dict(gridcolor="#f3f4f6"))
         st.plotly_chart(fig3, use_container_width=True)
 
-        # 팁
         st.subheader(f"💪 {goal_name} 추가 팁")
         for tip in GOAL_TIPS[goal_name]:
             st.markdown(f'<div class="tip-box">• {tip}</div>', unsafe_allow_html=True)
